@@ -12,7 +12,7 @@ import config
 from classes.ldap import LDAP_DB
 
 # Import module to test
-from routines.formatting import \
+from tools.formatting import \
     fmt_bool, fmt_int, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
     val2txt, txt2val, str2list, \
     process_container, get_dc_type_hints, \

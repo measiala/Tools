@@ -10,7 +10,7 @@ import config
 from classes.ldap import LDAP_DB
 
 # Import items to test
-from routines.method_helpers import \
+from tools.method_helpers import \
     base_add_item, base_read_file, base_read_xlsx, base_write_file
 
 # All of these tests are inherently tested by the various classes that call them
