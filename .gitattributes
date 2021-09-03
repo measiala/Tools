@@ -1,0 +1,7 @@
+# Text files should be normalized
+*               text=auto
+*.py            text eol=lf
+*.md            text eol=lf
+tests/*.py      text eol=lf
+.gitattributes  text eol=lf
+.gitignore      text eol=lf
