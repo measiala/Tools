@@ -2,21 +2,23 @@
 import pytest
 
 # Import global modules
-import typing
-import pathlib
 import collections
 import dataclasses
-
-# Local imports
-import config
-from classes.ldap import LDAP_DB
+import pathlib
+import sys
+import typing
 
 # Import module to test
-from tools.formatting import \
+from formatting import \
     fmt_bool, fmt_int, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
     val2txt, txt2val, str2list, \
-    process_container, get_dc_type_hints, \
+    process_container, get_ga_types, get_dc_type_hints, \
     define_dataclass, read_txt, write_txt, write_txt_class, write_txt_row
+
+def test_get_ga_types():
+    assert get_ga_types(typing.List[str]) == (list, (str,))
+    T = typing.TypeVar('T', str, int)
+    assert get_ga_types(typing.List[T]) == (list, (T,))
 
 def test_get_dc_type_hints():
     @dataclasses.dataclass
@@ -30,7 +32,9 @@ def test_get_dc_type_hints():
         a: typing.List[int] = dataclasses.field(default_factory=[1, 2, 3, 4])
         b: typing.Set[str] = dataclasses.field(default_factory={'a', 'b', 'c'})
         c: typing.Tuple[int] = dataclasses.field(default_factory=(1, 2, 3))
-        d: typing.Dict[str, list] = dataclasses.field(default_factory={'positions': ['QB', 'RB'], 'teams': ['DET', 'GB', 'CHI']})
+        d: typing.Dict[str, list] = dataclasses.field(
+            default_factory={'positions': ['QB', 'RB'], 'teams': ['DET', 'GB', 'CHI']}
+        )
         e: typing.List[None] = dataclasses.field(default_factory=[None])
 
     assert get_dc_type_hints(DtClass) == {
@@ -47,12 +51,15 @@ def test_get_dc_type_hints():
 
 def test_fmt_bool():
     assert fmt_bool(True, bool) == True
+    assert fmt_bool(True, int) == 1
+    assert fmt_bool(False, int) == 0
     assert fmt_bool(True, str) == 'True'
     assert fmt_bool(True, list) == [True]
     assert fmt_bool(True, set) == {True}
     assert fmt_bool(True, tuple) == (True,)
-    with pytest.raises(ValueError):
-        fmt_bool(True, int)
+    assert fmt_bool(True, typing.List[str]) == ['True']
+    assert fmt_bool(False, typing.Set[int]) == {0}
+    assert fmt_bool(True, typing.Tuple[list]) == ([True],)
     with pytest.raises(ValueError):
         fmt_bool(True, float)
     with pytest.raises(ValueError):
@@ -60,7 +67,8 @@ def test_fmt_bool():
 
 def test_fmt_int():
     assert fmt_int(37, int) == 37
-    assert fmt_int(37, bool) == False
+    assert fmt_int(37, bool) == True
+    assert fmt_int(-37, bool) == True
     assert fmt_int(0, bool) == False
     assert fmt_int(1, bool) == True
     assert fmt_int(37, str) == '37'
@@ -68,6 +76,9 @@ def test_fmt_int():
     assert fmt_int(37, list) == [37]
     assert fmt_int(37, set) == {37}
     assert fmt_int(37, tuple) == (37,)
+    assert fmt_int(37, typing.List[str]) == ['37']
+    assert fmt_int(37, typing.Set[bool]) == {True}
+    assert fmt_int(37, typing.Tuple[list]) == ([37],)
     with pytest.raises(ValueError):
         fmt_int(37, dict)
 
@@ -89,6 +100,10 @@ def test_fmt_str():
     assert fmt_str('123.4', float) == 123.4
     with pytest.raises(ValueError):
         fmt_str('123a', int)
+    assert fmt_str('37', typing.List[int]) == [37]
+    assert fmt_str('37', typing.Set[bool]) == {False}
+    assert fmt_str('true', typing.Set[bool]) == {True}
+    assert fmt_str('37', typing.Tuple[list]) == (['37'],)
 
 def test_fmt_list():
     assert fmt_list([], list) == []
@@ -113,28 +128,26 @@ def test_fmt_set():
     assert fmt_set({1, '2'}, tuple) in [(1, '2'), ('2', 1)]
     assert fmt_set({1, '2'}, list) in [[1, '2'], ['2', 1]]
     assert fmt_set({1, '2'}, set) in [{1, '2'}, {'2', 1}]
+    assert fmt_set({'a', '2'}, str) == '2,a'
     assert fmt_set({1, '1', 2, '2'}, typing.List[str]) in [['1', '2'], ['2', '1']]
     assert fmt_set({1, '1', 2, '2'}, typing.List[int]) == [1, 2]
     assert fmt_set({1, '1', 2, '2'}, typing.Set[str]) == {'1', '2'}
     assert fmt_set({1, '1', 2, '2'}, typing.Set[int]) == {1, 2}
     assert fmt_set({1, '1', 2, '2'}, typing.Tuple[int]) == (1, 2)
-    with pytest.raises(ValueError):
-        fmt_set({1, '2'}, str)
 
-def test_set_tuple():
+def test_fmt_tuple():
     assert fmt_tuple((), set) == set()
     assert fmt_tuple((), list) == []
     assert fmt_tuple((), tuple) == ()
     assert fmt_tuple((1, '2'), tuple) == (1, '2') # Volatile going from unordered to ordered
     assert fmt_tuple((1, '2'), list) == [1, '2']  # Volatile going from unordered to ordered
     assert fmt_tuple((1, '2'), set) == {1, '2'}
+    assert fmt_tuple((1, '2'), str) == '1,2'
     assert fmt_tuple((1, '1', 2, '2'), typing.List[str]) == ['1', '1', '2', '2']
     assert fmt_tuple((1, '1', 2, '2'), typing.List[int]) == [1, 1, 2, 2]
     assert fmt_tuple((1, '1', 2, '2'), typing.Set[str]) == {'1', '2'}
     assert fmt_tuple((1, '1', 2, '2'), typing.Set[int]) == {1, 2}
     assert fmt_tuple((1, '1', 2, '2'), typing.Tuple[int]) == (1, 1, 2, 2)
-    with pytest.raises(ValueError):
-        fmt_tuple((1, '2'), str)
 
 def test_fmt_value():
     # String
@@ -164,19 +177,18 @@ def test_fmt_value():
         fmt_value([1, 2, 3], dict)
     # Boolean
     assert fmt_value(True, bool) == True
+    assert fmt_value(True, int) == 1
     assert fmt_value(True, str) == 'True'
     assert fmt_value(True, list) == [True]
     assert fmt_value(True, set) == {True}
     assert fmt_value(True, tuple) == (True,)
-    with pytest.raises(ValueError):
-        fmt_value(True, int)
     with pytest.raises(ValueError):
         fmt_value(True, float)
     with pytest.raises(ValueError):
         fmt_value(True, dict)
     # Integer
     assert fmt_value(37, int) == 37
-    assert fmt_value(37, bool) == False
+    assert fmt_value(37, bool) == True
     assert fmt_value(0, bool) == False
     assert fmt_value(1, bool) == True
     assert fmt_value(37, str) == '37'
@@ -187,11 +199,10 @@ def test_fmt_value():
     with pytest.raises(ValueError):
         fmt_value(37, dict)
     # Set
-    #assert fmt_value({1, '2'}, tuple) == ('2', 1)
-    #assert fmt_value({1, '2'}, list) == ['2', 1]
+    assert fmt_value({1, '2'}, tuple) in [('2', 1), (1, '2')]
+    assert fmt_value({1, '2'}, list) in [['2', 1], [1, '2']]
     assert fmt_value({1, '2'}, set) == {1, '2'}
-    with pytest.raises(ValueError):
-        fmt_value({1, '2'}, str)
+    assert fmt_value({1, '2'}, str) == '1,2'
 
 def test_fmt_dataclass():
     # Set up
@@ -333,4 +344,5 @@ def test_write_txt_class():
     assert write_txt_class(stt, tt) == ['1', '1,2', 's,t', 'True']
 
 def test_write_txt_row():
+    ## assert write_txt_row()
     pass
