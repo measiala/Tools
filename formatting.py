@@ -499,6 +499,8 @@ def val2txt(v: typing.Any) -> str:
     :param v:  input value to be converted to a string
     :type v:  bool | dict | float | int | list | tuple | pathlib.Path | pathlib.PurePath | pathlib.PosixPath
     """
+    if isinstance(v, str):
+        return v
     if isinstance(v, (pathlib.Path, pathlib.PurePath, pathlib.PosixPath)):
         return str(v)
     if isinstance(v, set):

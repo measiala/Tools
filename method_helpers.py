@@ -155,7 +155,7 @@ def base_read_xls(infile, rt_list) -> int:
                     logger.warning('%s was not added, import stopped.', repr(row_inst))
                     raise
                 rt_nrows_read = rt_nrows_read + 1
-            rt_counts.append[rt_nrows_read]
+            rt_counts.append(rt_nrows_read)
             total_nrows_read = total_nrows_read + rt_nrows_read
     return total_nrows_read, rt_counts
 
@@ -179,31 +179,35 @@ def base_read_xlsx(infile, rt_list) -> int:
     """
     total_nrows_read = 0
     rt_counts = []
-    with openpyxl.load_workbook(infile) as wb:
-        for [sheet_name, add_func, rt_class] in rt_list:
-            rt_nrows_read = 0
+    #with openpyxl.load_workbook(filename=infile) as wb:
+    wb = openpyxl.load_workbook(filename=infile)
+    for [sheet_name, add_func, rt_class] in rt_list:
+        rt_nrows_read = 0
+        try:
+            ws = wb[sheet_name]
+        except KeyError:
+            raise KeyError(
+                'Excel worksheet %s not found in workbook %s, make sure source sheet is defined and named correctly.' \
+                    % (sheet_name, str(infile))
+            )
+        xls_rows = ws.values
+        next(xls_rows)
+        for xlsrow in xls_rows:
+            row = [str(val) for val in xlsrow]
             try:
-                ws = wb[sheet_name]
-            except KeyError:
-                raise KeyError(
-                    'Excel worksheet %s not found in workbook %s, make sure source sheet is defined and named correctly.' \
-                        % (sheet_name, str(infile))
+                row_inst = rt_class(*read_txt(row))
+            except TypeError:
+                raise TypeError('Excel workbook has %d columns in worksheet %s, expecting %d' \
+                    % (len(row), sheet_name, len(get_dc_type_hints(rt_class)))
                 )
-            for xlsrow in ws.values:
-                row = [str(val) for val in xlsrow]
-                try:
-                    row_inst = rt_class(*read_txt(row))
-                except TypeError:
-                    raise TypeError('Excel workbook has %d columns in worksheet %s, expecting %d' \
-                        % (len(row), sheet_name, len(get_dc_type_hints(rt_class)))
-                    )
-                try:
-                    add_func(row_inst)
-                except Exception:
-                    raise
-                rt_nrows_read = rt_nrows_read + 1
-            rt_counts.append[rt_nrows_read]
-            total_nrows_read = total_nrows_read + rt_nrows_read
+            
+            try:
+                add_func(row_inst)
+            except Exception:
+                raise
+            rt_nrows_read = rt_nrows_read + 1
+        rt_counts.append(rt_nrows_read)
+        total_nrows_read = total_nrows_read + rt_nrows_read
     return total_nrows_read, rt_counts
 
 def base_add_item(item_container, item_src_class, item_dest_class, item_key: str, item_dict: dict) -> list:

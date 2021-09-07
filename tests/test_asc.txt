@@ -1,0 +1,9 @@
+Type1|Value1.1|Value2.1
+Type1|Value1.2|Value2.2
+Type1|Value1.3|Value2.3
+Type1|Value1.4|Value2.4
+Type1|Value1.5|Value2.5
+Type2|Value1.1|Value2.1
+Type2|Value1.2|Value2.2
+Type2|Value1.3|Value2.3
+Type2|Value1.4|Value2.4
