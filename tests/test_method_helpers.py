@@ -7,8 +7,12 @@ import dataclasses
 import typing
 
 # Import items to test
-from method_helpers import \
+from ..method_helpers import \
     base_add_item, base_read_file, base_read_xls, base_read_xlsx, base_write_file
+
+# Root directory
+root = pathlib.Path.cwd()
+print(root.name)
 
 @dataclasses.dataclass
 class Type1Class:
@@ -44,7 +48,7 @@ def test_base_write_file():
 def test_base_read_xls():
     uc = UmbrellaClass('Test XLS')
     assert base_read_xls(
-        './tests/test_xls.xls',
+        root / 'tests' / 'test_xls.xls',
         [
             ['Type1', uc.add_t1, Type1Class],
             ['Type2', uc.add_t2, Type2Class]
@@ -67,7 +71,7 @@ def test_base_read_xls():
 def test_base_read_xlsx():
     uc = UmbrellaClass('Test XLSX')
     assert base_read_xlsx(
-        './tests/test_xlsx.xlsx',
+        root / 'tests' / 'test_xlsx.xlsx',
         [
             ['Type1', uc.add_t1, Type1Class],
             ['Type2', uc.add_t2, Type2Class]
@@ -90,7 +94,7 @@ def test_base_read_xlsx():
 def test_base_write_file():
     uc = UmbrellaClass('Test XLSX')
     assert base_read_xlsx(
-        './tests/test_xlsx.xlsx',
+        root / 'tests' / 'test_xlsx.xlsx',
         [
             ['Type1', uc.add_t1, Type1Class],
             ['Type2', uc.add_t2, Type2Class]
@@ -119,7 +123,7 @@ def test_base_write_file():
 def test_base_read_file():
     uc0 = UmbrellaClass('Test XLSX')
     assert base_read_xlsx(
-        './tests/test_xlsx.xlsx',
+        root / 'tests' / 'test_xlsx.xlsx',
         [
             ['Type1', uc0.add_t1, Type1Class],
             ['Type2', uc0.add_t2, Type2Class]
@@ -127,7 +131,7 @@ def test_base_read_file():
     ) == (9, [5, 4])
     uc1 = UmbrellaClass('Test XLSX')
     assert base_read_file(
-        './tests/test_asc.txt',
+        root / 'tests' / 'test_asc.txt',
         [
             ['Type1', uc1.add_t1, Type1Class],
             ['Type2', uc1.add_t2, Type2Class]

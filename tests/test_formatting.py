@@ -9,7 +9,7 @@ import sys
 import typing
 
 # Import module to test
-from formatting import \
+from ..formatting import \
     fmt_bool, fmt_int, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
     val2txt, txt2val, str2list, \
     process_container, get_ga_types, get_dc_type_hints, \
