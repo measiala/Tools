@@ -10,18 +10,14 @@
 # Import global modules
 import dataclasses
 import itertools
-import logging
 import pathlib
 import typing
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 # Alternative to typing.get_field_types that is more robust for subclasses
 # and also selective uses detailed versus generic type hints
 def get_ga_types(ga_type):
     """ Return base origin and arguments type of Generic type in a version-independent method
-    
+
     :param ga_type: Generic type defined using typing
     :type ga_type: typing.Generic
     """
@@ -36,17 +32,16 @@ def get_ga_types(ga_type):
     return _origin, _args
 
 def get_dc_type_hints(dc: dataclasses.dataclass) -> dict:
-    """ Create alternative to typing.get_field_types to see if fix problems 
-    
+    """ Create alternative to typing.get_field_types to see if fix problems
+
     :param dc: dataclass with type hinting from which we will extract the type hints into a dictionary
     :type dc: dataclass
     """
     type_dict = {}
     try:
         fields = dataclasses.fields(dc)
-    except (TypeError, AttributeError):
-        logger.warning('Input to get_dc_type_hints must be a dataclass')
-        raise
+    except (TypeError, AttributeError) as exc:
+        raise TypeError('Input to get_dc_type_hints must be a dataclass') from exc
     for x in fields:
         if isinstance(x.type, (typing._GenericAlias, typing._VariadicGenericAlias)):
             ### Limited GenericAlias support to typing.Dict/List/Set/Tuple[bool/int/str]
@@ -68,8 +63,8 @@ def get_dc_type_hints(dc: dataclasses.dataclass) -> dict:
 # Format single element values, form is : fmt_<dynamic_type>(value, <dest_type>)
 
 def fmt_bool(value, fmt) -> typing.Any:
-    """ Convert known boolean value to fmt 
-    
+    """ Convert known boolean value to fmt
+
     :param value:  boolean value to be reformatted
     :type value:  boolean
 
@@ -127,8 +122,8 @@ def fmt_float(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_int(value, fmt) -> typing.Any:
-    """ Convert known integer value to fmt 
-    
+    """ Convert known integer value to fmt
+
     :param value:  integer value to be reformatted
     :type value:  integer
 
@@ -139,7 +134,7 @@ def fmt_int(value, fmt) -> typing.Any:
     if fmt == int:
         return value
     if fmt == bool:
-        return not (value == 0)
+        return not value == 0
     if fmt == str:
         return str(value)
     if fmt == float:
@@ -165,8 +160,8 @@ def fmt_int(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_none(value, fmt) -> typing.Any:
-    """ Convert known None value to fmt 
-    
+    """ Convert known None value to fmt
+
     :param value:  None value to be reformatted
     :type value:  None
 
@@ -174,7 +169,7 @@ def fmt_none(value, fmt) -> typing.Any:
     :type fmt:  type class
     """
     # Simple conversions
-    if fmt == None:
+    if fmt is None:
         return value
     if fmt == str:
         return ''
@@ -197,8 +192,8 @@ def fmt_none(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_str(value, fmt) -> typing.Any:
-    """ Convert known string value to fmt 
-    
+    """ Convert known string value to fmt
+
     :param value:  string value to be reformatted
     :type value:  string
 
@@ -218,7 +213,8 @@ def fmt_str(value, fmt) -> typing.Any:
         try:
             new_value = float(value)
         except ValueError:
-            raise
+            # If ValueError then skip else block and it will pass to final return
+            pass
         else:
             if fmt == int:
                 # Note we only are reformatting here not transforming
@@ -248,13 +244,12 @@ def fmt_str(value, fmt) -> typing.Any:
         if base_fmt in [list, set, tuple]:
             if value:
                 return fmt_list([fmt_str(value, elem_fmt)], base_fmt)
-            else:
-                return fmt_str(value, base_fmt)
+            return fmt_str(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
 
 def fmt_dict(value, fmt) -> typing.Any:
-    """ Convert known dict value to fmt 
-    
+    """ Convert known dict value to fmt
+
     :param value:  dict value to be reformatted
     :type value:  dict of arbitrary elements
 
@@ -295,8 +290,8 @@ def fmt_dict(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
 
 def fmt_list(value, fmt) -> typing.Any:
-    """ Convert known list value to fmt 
-    
+    """ Convert known list value to fmt
+
     :param value:  list value to be reformatted
     :type value:  list of arbitrary elements
 
@@ -335,14 +330,13 @@ def fmt_list(value, fmt) -> typing.Any:
                     elem_fmt = _args[0]
                     new_list = [fmt_value(x, elem_fmt) for x in value]
                 return fmt_list(new_list, base_fmt)
-            else:
-                # Handle empty list so no elements to format
-                return fmt_list(value, base_fmt)
+            # Handle empty list so no elements to format
+            return fmt_list(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_set(value, fmt) -> typing.Any:
-    """ Convert known set value to fmt 
-    
+    """ Convert known set value to fmt
+
     :param value:  set value to be reformatted
     :type value:  set of arbitrary elements
 
@@ -374,8 +368,8 @@ def fmt_set(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_tuple(value, fmt) -> typing.Any:
-    """ Convert known tuple value to fmt 
-    
+    """ Convert known tuple value to fmt
+
     :param value:  tuple value to be reformatted
     :type value:  tuple of arbitrary elements
 
@@ -406,8 +400,8 @@ def fmt_tuple(value, fmt) -> typing.Any:
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_value(value, fmt) -> typing.Any:
-    """ Convert value of inferred type to fmt 
-    
+    """ Convert value of inferred type to fmt
+
     :param value:  list value to be reformatted
     :type value:  list of arbitrary elements
 
@@ -447,28 +441,23 @@ def fmt_dataclass(dc: dataclasses.dataclass) -> dataclasses.dataclass:
     try:
         dc_dict = dataclasses.asdict(dc)
         dc_types = get_dc_type_hints(dc)
-    except TypeError:
-        logger.warning('Must supply a type hinted dataclass as input')
-        raise
+    except TypeError as exc:
+        raise TypeError('Must supply a type hinted dataclass as input') from exc
 
     rdc_dict = {}
     for x in dc_dict:
         try:
             rdc_dict[x] = fmt_value(dc_dict[x], dc_types[x])
-        except TypeError:
-            logger.warning(
-                'Check that %s is in dataclass fields: %s', x, list(dc_dict.keys())
-            )
-            logger.warning(
-                'Check that %s is in dataclass type hints: %s', x, list(dc_types.keys())
-            )
-            raise
-        except ValueError:
-            logger.warning(
-                'Cannot handle putting field %s = %s into format %s',
-                str(x), str(dc_dict[x]), str(dc_types[x])
-            )
-            raise
+        except TypeError as exc:
+            raise TypeError(
+                'Check that %s is in dataclass fields %s and in type hints %s' \
+                % (x, list(dc_dict.keys()), list(dc_types.keys()))
+            ) from exc
+        except ValueError as exc:
+            raise ValueError(
+                'Cannot handle putting field %s = %s into format %s' \
+                % (str(x), str(dc_dict[x]), str(dc_types[x]))
+            ) from exc
 
     rdc = getattr(dc, '__class__')
     return rdc(**rdc_dict)
@@ -479,19 +468,18 @@ def fmt_dataclass(dc: dataclasses.dataclass) -> dataclasses.dataclass:
 ##
 
 def str2list(name) -> list:
-    """ If name is string then return list else if already a list then simply return name 
-    
+    """ If name is string then return list else if already a list then simply return name
+
     :param name:  standardizes input of string or list to be a list
     :type name:  string | list
     """
     if not isinstance(name, (str, list)):
-        logger.warning("Expecting name %s to be a string or a list", name)
-        raise ValueError
+        raise ValueError("Expecting name %s to be a string or a list", name)
+
     try:
         return fmt_value(name, list)
-    except ValueError:
-        logger.warning("Expecting name %s to be item that can be converted to a list", name)
-        raise
+    except ValueError as exc:
+        raise ValueError("Expecting name %s to be item that can be converted to a list", name) from exc
 
 def val2txt(v: typing.Any) -> str:
     """ Creates a string version of all acceptable inputs, helpful if writing to an ASCII file
@@ -510,8 +498,8 @@ def val2txt(v: typing.Any) -> str:
     raise ValueError('Following value cannot be converted to text', v)
 
 def txt2val(v) -> typing.Any:
-    """ Convert text value provided to guessed python type 
-    
+    """ Convert text value provided to guessed python type
+
     :param v:  value of unknown type read in from a string input
     :type v:  string
     """
@@ -560,10 +548,10 @@ def txt2val(v) -> typing.Any:
     return fv
 
 def process_container(container, dc: dataclasses.dataclass = str) -> list:
-    """ Process container to format into list of dataclasses 
-    
-    :param container:  this is a generic container to be standardized to list[dataclass]. 
-        If it is a list then it is assumed that only the first element has its intended 
+    """ Process container to format into list of dataclasses
+
+    :param container:  this is a generic container to be standardized to list[dataclass].
+        If it is a list then it is assumed that only the first element has its intended
         format and that the number of elements equals the number of variables in the dataclass.
     :type container:  str | list | dataclass | list[dataclass]
     """
@@ -624,8 +612,8 @@ def process_container(container, dc: dataclasses.dataclass = str) -> list:
 ##
 
 def define_dataclass(c: object, dc: dataclasses.dataclass) -> dataclasses.dataclass:
-    """ Output dataclass instance where values come from generic class c corresponding to attributes listed in dc 
-    
+    """ Output dataclass instance where values come from generic class c corresponding to attributes listed in dc
+
     :param c:  class containing some or all of variables in dc
     :type c:  generic object
 
@@ -644,15 +632,15 @@ def define_dataclass(c: object, dc: dataclasses.dataclass) -> dataclasses.datacl
 
 def read_txt(input_list) -> list:
     """ Attempt to autoconvert values in input_list and return a new list containing guessed formatted values
-    
+
     :param input_list:  unformatted list of strings
     :type input_list:  list[str]
     """
     return [txt2val(x) for x in input_list]
 
 def write_txt(dc) -> typing.List[str]:
-    """ Output list of strings in order they appear in dataclass dc 
-    
+    """ Output list of strings in order they appear in dataclass dc
+
     :param dc:  dataclass containing variables to output
     :type dc:  dataclass
     """
@@ -661,14 +649,13 @@ def write_txt(dc) -> typing.List[str]:
     except (TypeError, AttributeError):
         try:
             field_names = dc._fields
-        except AttributeError:
-            logger.warning('Input to write_txt must be dataclass or tuple')
-            raise TypeError
+        except AttributeError as exc:
+            raise TypeError('Input to write_txt must be dataclass or tuple') from exc
     return [val2txt(getattr(dc, field)) for field in field_names]
 
 def write_txt_class(c: object, dc: object) -> typing.List[str]:
-    """ Output list of strings where values come from generic class c with attributes from dc 
-    
+    """ Output list of strings where values come from generic class c with attributes from dc
+
     :param c:  class containing some or all of variables in dc
     :type c:  generic object
 
@@ -680,14 +667,13 @@ def write_txt_class(c: object, dc: object) -> typing.List[str]:
     except (TypeError, AttributeError):
         try:
             field_names = dc._fields
-        except AttributeError:
-            logger.warning('Input to write_txt must be dataclass or tuple')
-            raise TypeError
+        except AttributeError as exc:
+            raise TypeError('Input to write_txt must be dataclass or tuple') from exc
     return [val2txt(getattr(c, field)) for field in field_names]
 
 def write_txt_row(src_inst: object, dest_class: object=None):
     """ This function acts like write_txt_class if dest_class is specified
-        but is equivalent to write_txt if not specified 
+        but is equivalent to write_txt if not specified
 
     :param src_inst:  class containing some or all of variables in dc
     :type src_inst:  generic object
@@ -699,7 +685,6 @@ def write_txt_row(src_inst: object, dest_class: object=None):
         dest_class = type(src_inst)
     try:
         field_names = get_dc_type_hints(dest_class)
-    except (TypeError, AttributeError):
-        logger.warning('Input to write_txt_row must be dataclass')
-        raise TypeError
+    except (TypeError, AttributeError) as exc:
+        raise TypeError('Input to write_txt_row must be dataclass') from exc
     return [val2txt(getattr(src_inst, field)) for field in field_names]
