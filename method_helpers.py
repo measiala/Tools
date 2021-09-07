@@ -14,7 +14,7 @@ import openpyxl
 import xlrd
 
 # Import local modules
-from formatting import read_txt, write_txt_class, write_txt_row, \
+from .formatting import read_txt, write_txt_class, write_txt_row, \
     process_container, fmt_dataclass, get_dc_type_hints
 
 # Register default dialect
