@@ -10,7 +10,7 @@ import typing
 
 # Import module to test
 from ..formatting import \
-    fmt_bool, fmt_int, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
+    fmt_bool, fmt_int, fmt_none, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
     val2txt, txt2val, str2list, \
     process_container, get_ga_types, get_dc_type_hints, \
     define_dataclass, read_txt, write_txt, write_txt_class, write_txt_row
@@ -82,6 +82,22 @@ def test_fmt_int():
     with pytest.raises(ValueError):
         fmt_int(37, dict)
 
+def test_fmt_none():
+    assert fmt_none(None, None) == None
+    with pytest.raises(ValueError):
+        fmt_none(None, bool)
+    with pytest.raises(ValueError):
+        fmt_none(None, int)
+    with pytest.raises(ValueError):
+        fmt_none(None, float)
+    assert fmt_none(None, str) == ''
+    assert fmt_none(None, list) == []
+    assert fmt_none(None, set) == set()
+    assert fmt_none(None, tuple) == tuple()
+    assert fmt_none(None, typing.List[str]) == []
+    assert fmt_none(None, typing.Set[str]) == set()
+    assert fmt_none(None, typing.Tuple[str]) == tuple()
+
 def test_fmt_str():
     assert fmt_str('123', str) == '123'
     assert fmt_str('123', list) == ['123']
@@ -100,6 +116,9 @@ def test_fmt_str():
     assert fmt_str('123.4', float) == 123.4
     with pytest.raises(ValueError):
         fmt_str('123a', int)
+    assert fmt_str('', typing.List[str]) == []
+    assert fmt_str('', typing.Set[str]) == set()
+    assert fmt_str('', typing.Tuple[str]) == tuple()
     assert fmt_str('37', typing.List[int]) == [37]
     assert fmt_str('37', typing.Set[bool]) == {False}
     assert fmt_str('true', typing.Set[bool]) == {True}

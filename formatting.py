@@ -188,7 +188,7 @@ def fmt_none(value, fmt) -> typing.Any:
         base_fmt, _args = get_ga_types(fmt)
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
-            return fmt_list([fmt_str(value, elem_fmt)], base_fmt)
+            return fmt_none(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
 def fmt_str(value, fmt) -> typing.Any:
