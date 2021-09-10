@@ -268,6 +268,7 @@ def test_str2list():
         str2list(1)
 
 def test_val2txt():
+    assert val2txt(None) == ''
     assert val2txt(1) == '1'
     assert val2txt(1.5) == '1.5'
     assert val2txt(1.50) == '1.5'
@@ -283,6 +284,7 @@ def test_val2txt():
     assert val2txt([1,'s',True]) == '1,s,True'
 
 def test_txt2val():
+    assert txt2val('None') == None
     assert txt2val('1') == 1
     assert txt2val('1.0') == 1
     assert txt2val('1.5') == 1.5

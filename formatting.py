@@ -493,7 +493,7 @@ def val2txt(v: typing.Any) -> str:
         return str(v)
     if isinstance(v, set):
         return fmt_list(sorted(v), str)
-    if isinstance(v, (bool, dict, float, int, list, tuple)):
+    if isinstance(v, (bool, dict, float, int, list, tuple)) or v is None:
         return fmt_value(v, str)
     raise ValueError('Following value cannot be converted to text', v)
 
@@ -506,6 +506,8 @@ def txt2val(v) -> typing.Any:
     # If the string contains a boolean keyword then treat as boolean
     if not isinstance(v, str):
         return v
+    if v == 'None':
+        return None
     if v.title() in ['True', 'False']:
         return v.title() == 'True'
     # If the string contains a comma treat as list
