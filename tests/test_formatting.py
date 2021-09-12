@@ -10,15 +10,17 @@ import typing
 
 # Import module to test
 from ..formatting import \
-    fmt_bool, fmt_int, fmt_none, fmt_str, fmt_list, fmt_set, fmt_tuple, fmt_value, fmt_dataclass, \
-    val2txt, txt2val, str2list, \
-    process_container, get_ga_types, get_dc_type_hints, \
+    fmt_bool, fmt_float, fmt_int, fmt_none, fmt_str, fmt_dict, fmt_list, fmt_set, fmt_tuple, \
+    fmt_value, fmt_dataclass, val2txt, txt2val, str2list, \
+    process_container, get_ga_types, get_dc_type_hints, populate_list, \
     define_dataclass, read_txt, write_txt, write_txt_class, write_txt_row
 
 def test_get_ga_types():
     assert get_ga_types(typing.List[str]) == (list, (str,))
     T = typing.TypeVar('T', str, int)
     assert get_ga_types(typing.List[T]) == (list, (T,))
+    with pytest.raises(TypeError):
+        get_ga_types(list)
 
 def test_get_dc_type_hints():
     @dataclasses.dataclass
@@ -65,6 +67,21 @@ def test_fmt_bool():
     with pytest.raises(ValueError):
         fmt_bool(True, dict)
 
+def test_fmt_float():
+    assert fmt_float(1.5, float) == 1.5
+    assert fmt_float(1.5, str) == '1.5'
+    assert fmt_float(1.5, list) == [1.5]
+    assert fmt_float(1.5, set) == {1.5}
+    assert fmt_float(1.5, tuple) == (1.5,)
+    assert fmt_float(1.5, typing.List[float]) == [1.5]
+    assert fmt_float(1.5, typing.Set[float]) == {1.5}
+    assert fmt_float(1.5, typing.Tuple[float]) == (1.5,)
+    assert fmt_float(1.5, typing.List[str]) == ['1.5']
+    assert fmt_float(1.5, typing.Set[str]) == {'1.5'}
+    assert fmt_float(1.5, typing.Tuple[str]) == ('1.5',)
+    with pytest.raises(ValueError):
+        fmt_float(1.5, int)
+
 def test_fmt_int():
     assert fmt_int(37, int) == 37
     assert fmt_int(37, bool) == True
@@ -94,6 +111,7 @@ def test_fmt_none():
     assert fmt_none(None, list) == []
     assert fmt_none(None, set) == set()
     assert fmt_none(None, tuple) == tuple()
+    assert fmt_none(None, dict) == {}
     assert fmt_none(None, typing.List[str]) == []
     assert fmt_none(None, typing.Set[str]) == set()
     assert fmt_none(None, typing.Tuple[str]) == tuple()
@@ -123,12 +141,26 @@ def test_fmt_str():
     assert fmt_str('37', typing.Set[bool]) == {False}
     assert fmt_str('true', typing.Set[bool]) == {True}
     assert fmt_str('37', typing.Tuple[list]) == (['37'],)
+    assert fmt_str('', typing.List[int]) == []
+    assert fmt_str('', typing.Set[int]) == set()
+    assert fmt_str('', typing.Tuple[int]) == tuple()
+
+def test_fmt_dict():
+    assert fmt_dict({}, dict) == {}
+    assert fmt_dict({1: '1'}, dict) == {1: '1'}
+    assert fmt_dict({1: '1'}, str) == '1,1'
+    assert fmt_dict({1: '1'}, list) == [1, '1']
+    assert fmt_dict({1: '1'}, typing.List[int]) == [1, 1]
+    assert fmt_dict({1: '1'}, typing.Dict[int, str]) == {1: '1'}
+    with pytest.raises(ValueError):
+        fmt_dict({1: '1'}, bool)
 
 def test_fmt_list():
     assert fmt_list([], list) == []
     assert fmt_list([1], list) == [1]
     assert fmt_list([1, 2, 3], set) == {1, 2, 3}
     assert fmt_list([1, 2, 3], tuple) == (1, 2, 3)
+    assert fmt_list([], str) == ''
     assert fmt_list([1, 2, 3], str) == '1,2,3'
     assert fmt_list([1, 2, 3, 4], dict) == { 1: 2, 3: 4}
     with pytest.raises(ValueError):
@@ -139,6 +171,7 @@ def test_fmt_list():
     assert fmt_list([1, '1', 2, '2'], typing.Dict[str, int]) == {'1': 1, '2': 2}
     assert fmt_list([1, '1', 2, '2'], typing.Set[str]) == {'1', '2'}
     assert fmt_list([1, '1', 2, '2'], typing.Tuple[int]) == (1, 1, 2, 2)
+    assert fmt_list([], typing.Set[str]) == set()
 
 def test_fmt_set():
     assert fmt_set(set(), set) == set()
@@ -153,6 +186,8 @@ def test_fmt_set():
     assert fmt_set({1, '1', 2, '2'}, typing.Set[str]) == {'1', '2'}
     assert fmt_set({1, '1', 2, '2'}, typing.Set[int]) == {1, 2}
     assert fmt_set({1, '1', 2, '2'}, typing.Tuple[int]) == (1, 2)
+    with pytest.raises(ValueError):
+        fmt_set({1, 2}, bool)
 
 def test_fmt_tuple():
     assert fmt_tuple((), set) == set()
@@ -167,6 +202,8 @@ def test_fmt_tuple():
     assert fmt_tuple((1, '1', 2, '2'), typing.Set[str]) == {'1', '2'}
     assert fmt_tuple((1, '1', 2, '2'), typing.Set[int]) == {1, 2}
     assert fmt_tuple((1, '1', 2, '2'), typing.Tuple[int]) == (1, 1, 2, 2)
+    with pytest.raises(ValueError):
+        fmt_tuple((1, 2), bool)
 
 def test_fmt_value():
     # String
@@ -222,6 +259,8 @@ def test_fmt_value():
     assert fmt_value({1, '2'}, list) in [['2', 1], [1, '2']]
     assert fmt_value({1, '2'}, set) == {1, '2'}
     assert fmt_value({1, '2'}, str) == '1,2'
+    with pytest.raises(ValueError):
+        fmt_value(pathlib.Path('./'), str)
 
 def test_fmt_dataclass():
     # Set up
@@ -255,6 +294,18 @@ def test_fmt_dataclass():
     assert dcf.li == ['foo', 'bar']
     assert dcf.si == {1, 2}
 
+    class FailTest:
+        def __init__(self, b, f):
+            self.b = b
+            self.f = f
+    ft = FailTest('1', '2')
+    with pytest.raises(TypeError):
+        fmt_dataclass(ft)
+
+    dc.b = {1, 2}
+    with pytest.raises(ValueError):
+        fmt_dataclass(dc)
+
 ##
 ## Routines to convert a value from one type to text and vice versa
 ##
@@ -282,13 +333,25 @@ def test_val2txt():
     assert val2txt({'1': 's'}) == '1,s'
     assert val2txt([[1,2],3]) == '1,2,3'
     assert val2txt([1,'s',True]) == '1,s,True'
+    assert val2txt(pathlib.PosixPath('./foo/bar.foo')) == 'foo/bar.foo'
+    with pytest.raises(ValueError):
+        val2txt(ValueError)
 
 def test_txt2val():
+    assert txt2val(None) == None
+    assert txt2val(1) == 1
     assert txt2val('None') == None
     assert txt2val('1') == 1
     assert txt2val('1.0') == 1
     assert txt2val('1.5') == 1.5
     assert txt2val('1.50') == 1.50
+    assert txt2val('0b110') == 6
+    assert txt2val('0b110x') == '0b110x'
+    assert txt2val('0b110') == 6
+    assert txt2val('0o770') == 7*64 + 7*8
+    assert txt2val('0o770x') == '0o770x'
+    assert txt2val('0x110') == 1*256 + 1*16
+    assert txt2val('0x110x') == '0x110x'
     assert txt2val('True') == True
     assert txt2val('False') == False
     assert txt2val('true') == True
@@ -302,7 +365,21 @@ def test_process_container():
     class TestDC:
         x: int
         y: set
+    class FailTest:
+        def __init__(self, b, f):
+            self.b = b
+            self.f = f
 
+    # str or list[str]
+    assert process_container('12', str) == ['12']
+    with pytest.raises(ValueError):
+        process_container('12', list)
+    assert process_container(['12'], str) == ['12']
+    assert process_container(['1', '2'], str) == ['1', '2']
+    with pytest.raises(ValueError):
+        process_container(['1', 2], str)
+    with pytest.raises(ValueError):
+        process_container({'1', '2'}, str)
     # Container is list of parameters for one dataclass
     assert process_container([1, {1,2}], TestDC) == [TestDC(x=1, y={1,2})]
     # Container is a list of list of parameters to define a list of dataclasses
@@ -311,10 +388,42 @@ def test_process_container():
     assert process_container(TestDC(1, {1,2}), TestDC) == [TestDC(x=1, y={1,2})]
     # Container is a list of dataclasses
     assert process_container([TestDC(1, {1,2}), TestDC(2, {3,4})], TestDC) == [TestDC(x=1, y={1,2}), TestDC(2, {3,4})]
+    with pytest.raises(ValueError):
+        process_container([TestDC(1, {1,2}), [1, {1,2}]], TestDC)
+    with pytest.raises(TypeError):
+        process_container([TestDC(1, {1,2}), [1, {1,2}]], FailTest)
 
 ##
 ## Helpers to read and write dataclasses to lists and vice versa
 ##
+
+def test_populate_list():
+    class TestClass:
+        def __init__(self, name, groups, platforms, other = None):
+            self.name = name
+            self.groups = groups
+            self.platforms = platforms
+            self.other = other
+
+    @dataclasses.dataclass
+    class DtClass:
+        groups: list
+        name: str
+        platforms: list
+
+    @dataclasses.dataclass
+    class DtClass2:
+        groups: list
+        name: str
+        platforms: list
+        name2: str
+
+    assert populate_list(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass
+            ) == [['g1', 'g2'], 'nemo', ['p1', 'p2']]
+    assert populate_list(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass2
+            ) == [['g1', 'g2'], 'nemo', ['p1', 'p2'], '']
 
 def test_define_dataclass():
     class TestClass:
@@ -330,40 +439,84 @@ def test_define_dataclass():
         name: str
         platforms: list
 
-    user_inst = TestClass('lead', ['group', 'group1', 'group2'], ['PS-PROD'])
-
-    assert define_dataclass(user_inst, DtClass) == DtClass(['group','group1','group2'], 'lead', ['PS-PROD'])
+    assert define_dataclass(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass
+            ) == DtClass(
+                groups=['g1', 'g2'], name='nemo', platforms=['p1', 'p2']
+            )
+    with pytest.raises(TypeError):
+        define_dataclass(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), TestClass
+            )
 
 def test_read_txt():
     t_str = '1,2|s,t|True'
     t_list = t_str.split('|')
     assert read_txt(t_list) == [[1, 2], ['s', 't'], True]
 
-def test_write_txt():
-    # Set up
-    tup = collections.namedtuple('Test', 'w x y z')
-    tt = tup(w=1, x={1,2}, y=('s', 't'), z=True)
-
-    assert write_txt(tt) == ['1', '1,2', 's,t', 'True']
-
-    ############## Add dataclass test values #########################
-
 def test_write_txt_class():
     # Set up
-    ############## Add dataclass test values #########################
-    tup = collections.namedtuple('Test', 'w x y z')
-    stup = collections.namedtuple('Test', 'z y w x')
-    tt = tup(w=1, x={1,2}, y=('s', 't'), z=True)
-    stt = stup(w=1, x={1,2}, y=('s', 't'), z=True)
+    class TestClass:
+        def __init__(self, name, groups, platforms, other = None):
+            self.name = name
+            self.groups = groups
+            self.platforms = platforms
+            self.other = other
 
-    assert list(tt) == [1, {1,2}, ('s','t'), True]
-    assert list(stt) == [True, ('s','t'), 1, {1,2}]
+    @dataclasses.dataclass
+    class DtClass:
+        groups: list
+        name: str
+        platforms: list
+    assert write_txt_class(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass
+            ) == ['g1,g2', 'nemo', 'p1,p2']
+    with pytest.raises(TypeError):
+        write_txt_class(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), TestClass
+            )
 
-    assert write_txt(tt) == ['1', '1,2', 's,t', 'True']
-    assert write_txt(stt) == ['True', 's,t', '1', '1,2']
 
-    assert write_txt_class(stt, tt) == ['1', '1,2', 's,t', 'True']
+def test_write_txt():
+    # Set up
+    class TestClass:
+        def __init__(self, name, groups, platforms, other = None):
+            self.name = name
+            self.groups = groups
+            self.platforms = platforms
+            self.other = other
+
+    @dataclasses.dataclass
+    class DtClass:
+        groups: list
+        name: str
+        platforms: list
+    assert write_txt(
+        DtClass(groups=['g1', 'g2'], name='nemo', platforms=['p1', 'p2'])
+    ) == ['g1,g2', 'nemo', 'p1,p2']
+
 
 def test_write_txt_row():
     ## assert write_txt_row()
-    pass
+    class TestClass:
+        def __init__(self, name, groups, platforms, other = None):
+            self.name = name
+            self.groups = groups
+            self.platforms = platforms
+            self.other = other
+
+    @dataclasses.dataclass
+    class DtClass:
+        groups: list
+        name: str
+        platforms: list
+    assert write_txt_class(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass
+            ) == ['g1,g2', 'nemo', 'p1,p2']
+
+    assert write_txt_row(
+                TestClass('nemo', ['g1', 'g2'], ['p1', 'p2'], 'thing'), DtClass
+            ) == ['g1,g2', 'nemo', 'p1,p2']
+    assert write_txt_row(
+        DtClass(groups=['g1', 'g2'], name='nemo', platforms=['p1', 'p2'])
+    ) == ['g1,g2', 'nemo', 'p1,p2']

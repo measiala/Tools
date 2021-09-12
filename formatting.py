@@ -11,27 +11,37 @@
 import dataclasses
 import itertools
 import pathlib
+import sys
 import typing
 
 # Alternative to typing.get_field_types that is more robust for subclasses
 # and also selective uses detailed versus generic type hints
-def get_ga_types(ga_type):
+
+
+def get_ga_types(ga_type: typing.Type) -> typing.Tuple[typing.Any, typing.Tuple[typing.Any, ...]]:
     """ Return base origin and arguments type of Generic type in a version-independent method
 
     :param ga_type: Generic type defined using typing
     :type ga_type: typing.Generic
     """
-    try:
+    if sys.version_info >= (3, 8, 0):
         # python 3.8+: functions were added in 3.8
         _origin = typing.get_origin(ga_type)
         _args = typing.get_args(ga_type)
-    except AttributeError:
-        # python < 3.8: above results in AttributeError where not supported
-        _origin = ga_type.__origin__
-        _args = ga_type.__args__
+        if (_origin, _args) == (None, ()):
+            raise TypeError('Position parameter for get_ga_types must be a Generic class')
+    elif sys.version_info >= (3, 7, 0):
+        try:
+            _origin = ga_type.__origin__
+            _args = ga_type.__args__
+        except AttributeError as exc:
+            raise TypeError('Position parameter for get_ga_types must be a Generic class') from exc
+    else:
+        raise NotImplementedError('Support is not provided for python version < v3.7')
     return _origin, _args
 
-def get_dc_type_hints(dc: dataclasses.dataclass) -> dict:
+
+def get_dc_type_hints(dc: object) -> typing.Dict[str, typing.Any]:
     """ Create alternative to typing.get_field_types to see if fix problems
 
     :param dc: dataclass with type hinting from which we will extract the type hints into a dictionary
@@ -43,26 +53,32 @@ def get_dc_type_hints(dc: dataclasses.dataclass) -> dict:
     except (TypeError, AttributeError) as exc:
         raise TypeError('Input to get_dc_type_hints must be a dataclass') from exc
     for x in fields:
-        if isinstance(x.type, (typing._GenericAlias, typing._VariadicGenericAlias)):
-            ### Limited GenericAlias support to typing.Dict/List/Set/Tuple[bool/int/str]
-            _args_in = True
+        try:
             _origin, _args = get_ga_types(x.type)
-            for _a in _args:
-                # Only process typing.GenericAlias[bool/int/str/list/set/tuple]
-                if _a not in [bool, int, str, list, set, tuple]:
-                    _args_in = False
-                    break
-            if _origin in [list, dict, set, tuple] and _args_in:
-                type_dict[x.name] = x.type              # Try basic GenericAlias approach
-            else:
-                type_dict[x.name] = _origin             # This removes the types of the args
-        else:
+        except TypeError:
+            # get_ga_types will return TypeError if not a generic class
             type_dict[x.name] = x.type
+            continue
+
+        # Path where type is a generic alias
+        _args_in = True
+
+        for _a in _args:
+            # Only process typing.GenericAlias[bool/int/str/list/set/tuple]
+            if _a not in [bool, int, str, list, set, tuple]:
+                _args_in = False
+                break
+        if _origin in [list, dict, set, tuple] and _args_in:
+            type_dict[x.name] = x.type              # Try basic GenericAlias approach
+        else:
+            type_dict[x.name] = _origin             # This removes the types of the args
+        continue
     return type_dict
+
 
 # Format single element values, form is : fmt_<dynamic_type>(value, <dest_type>)
 
-def fmt_bool(value, fmt) -> typing.Any:
+def fmt_bool(value: bool, fmt: type) -> typing.Any:
     """ Convert known boolean value to fmt
 
     :param value:  boolean value to be reformatted
@@ -89,16 +105,21 @@ def fmt_bool(value, fmt) -> typing.Any:
     if fmt == tuple:
         return tuple([value])
     # typing.[List | Set | Tuple][elem_fmt]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # Move on to next step
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             return fmt_list([fmt_bool(value, elem_fmt)], base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_float(value, fmt) -> typing.Any:
+
+def fmt_float(value: float, fmt: type) -> typing.Any:
     # Do nothing
     if fmt == float:
         return value
@@ -112,16 +133,22 @@ def fmt_float(value, fmt) -> typing.Any:
     if fmt == tuple:
         return (value,)
     # typing.[List | Set | Tuple][elem_fmt]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # Skip to next test or raise error at end
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
+
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             return fmt_list([fmt_float(value, elem_fmt)], base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_int(value, fmt) -> typing.Any:
+
+def fmt_int(value: int, fmt: type) -> typing.Any:
     """ Convert known integer value to fmt
 
     :param value:  integer value to be reformatted
@@ -149,17 +176,22 @@ def fmt_int(value, fmt) -> typing.Any:
     if fmt == tuple:
         return tuple([value])
     # typing.[List | Set | Tuple][elem_fmt]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # Skip to next test if present
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             print(base_fmt, elem_fmt, fmt_int(value, elem_fmt))
             return fmt_list([fmt_int(value, elem_fmt)], base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_none(value, fmt) -> typing.Any:
+
+def fmt_none(value: None, fmt: type) -> typing.Any:
     """ Convert known None value to fmt
 
     :param value:  None value to be reformatted
@@ -182,16 +214,20 @@ def fmt_none(value, fmt) -> typing.Any:
     if fmt == tuple:
         return tuple()
     # typing.[List | Set | Tuple][elem_fmt]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
-        elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             return fmt_none(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_str(value, fmt) -> typing.Any:
+
+def fmt_str(value: str, fmt: type) -> typing.Any:
     """ Convert known string value to fmt
 
     :param value:  string value to be reformatted
@@ -236,18 +272,22 @@ def fmt_str(value, fmt) -> typing.Any:
     if fmt == tuple:
         return tuple([value])
     # typing.[List | Set | Tuple][elem_fmt]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             if value:
                 return fmt_list([fmt_str(value, elem_fmt)], base_fmt)
-            return fmt_str(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
 
-def fmt_dict(value, fmt) -> typing.Any:
+
+def fmt_dict(value: dict, fmt: type) -> typing.Any:
     """ Convert known dict value to fmt
 
     :param value:  dict value to be reformatted
@@ -270,10 +310,14 @@ def fmt_dict(value, fmt) -> typing.Any:
             new_list.append(value[x])
         return new_list
     # typing.[List | Dict]
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         if base_fmt in [list, dict]:
             key_fmt = _args[0]
             if base_fmt == list:
@@ -289,7 +333,8 @@ def fmt_dict(value, fmt) -> typing.Any:
             return fmt_dict(new_dict, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
 
-def fmt_list(value, fmt) -> typing.Any:
+
+def fmt_list(value: list, fmt: type) -> typing.Any:
     """ Convert known list value to fmt
 
     :param value:  list value to be reformatted
@@ -314,10 +359,14 @@ def fmt_list(value, fmt) -> typing.Any:
     if fmt == dict and len(value) % 2 == 0:
         return {value[k]: value[k+1] for k in range(0, len(value), 2)}
     # Generic types
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
         # Order is to convert all elements of list to format, then convert the list
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         if base_fmt in [dict, list, set, tuple]:
             if len(value):
                 # Format the elements then repass into function to set base_fmt
@@ -333,6 +382,7 @@ def fmt_list(value, fmt) -> typing.Any:
             # Handle empty list so no elements to format
             return fmt_list(value, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+
 
 def fmt_set(value, fmt) -> typing.Any:
     """ Convert known set value to fmt
@@ -357,17 +407,22 @@ def fmt_set(value, fmt) -> typing.Any:
     if fmt == tuple:
         return tuple(value)
     # Generic types
-    if isinstance(fmt, typing._GenericAlias):
+    try:
+        base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
         # Order is to convert all elements of set to format, then convert the set
         # base_fmt is standard generic format of type
-        base_fmt, _args = get_ga_types(fmt)
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             new_set = {fmt_value(x, elem_fmt) for x in value}
             return fmt_set(new_set, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_tuple(value, fmt) -> typing.Any:
+
+def fmt_tuple(value: tuple, fmt: type) -> typing.Any:
     """ Convert known tuple value to fmt
 
     :param value:  tuple value to be reformatted
@@ -390,16 +445,21 @@ def fmt_tuple(value, fmt) -> typing.Any:
     if fmt == set:
         return set(value)
     # typing Generic Types
-    if isinstance(fmt, typing._GenericAlias):
-        # base_fmt is standard generic format of type
+    try:
         base_fmt, _args = get_ga_types(fmt)
+    except TypeError:
+        # skip to next test
+        pass
+    else:
+        # base_fmt is standard generic format of type
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             new_tuple = tuple([fmt_value(x, elem_fmt) for x in value])
             return fmt_tuple(new_tuple, base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_value(value, fmt) -> typing.Any:
+
+def fmt_value(value: typing.Any, fmt: type) -> typing.Any:
     """ Convert value of inferred type to fmt
 
     :param value:  list value to be reformatted
@@ -432,7 +492,8 @@ def fmt_value(value, fmt) -> typing.Any:
         return fmt_tuple(value, fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
-def fmt_dataclass(dc: dataclasses.dataclass) -> dataclasses.dataclass:
+
+def fmt_dataclass(dc: object) -> object:
     """ Format the variable values in dataclass according to its defined type hints
 
     :param dc: dataclass with type hints defined but with unformatted values
@@ -448,26 +509,21 @@ def fmt_dataclass(dc: dataclasses.dataclass) -> dataclasses.dataclass:
     for x in dc_dict:
         try:
             rdc_dict[x] = fmt_value(dc_dict[x], dc_types[x])
-        except TypeError as exc:
-            raise TypeError(
-                'Check that %s is in dataclass fields %s and in type hints %s' \
-                % (x, list(dc_dict.keys()), list(dc_types.keys()))
-            ) from exc
         except ValueError as exc:
             raise ValueError(
-                'Cannot handle putting field %s = %s into format %s' \
+                'Cannot handle putting field %s = %s into format %s'
                 % (str(x), str(dc_dict[x]), str(dc_types[x]))
             ) from exc
 
     rdc = getattr(dc, '__class__')
     return rdc(**rdc_dict)
 
-##
-## Routines to convert a value from one type to text and vice versa. These can serve as
-## examples of specialized applications of the formatting above.
-##
 
-def str2list(name) -> list:
+# Routines to convert a value from one type to text and vice versa. These can serve as
+# examples of specialized applications of the formatting above.
+
+
+def str2list(name: typing.Union[str, list]) -> list:
     """ If name is string then return list else if already a list then simply return name
 
     :param name:  standardizes input of string or list to be a list
@@ -475,11 +531,8 @@ def str2list(name) -> list:
     """
     if not isinstance(name, (str, list)):
         raise ValueError("Expecting name %s to be a string or a list", name)
+    return fmt_value(name, list)
 
-    try:
-        return fmt_value(name, list)
-    except ValueError as exc:
-        raise ValueError("Expecting name %s to be item that can be converted to a list", name) from exc
 
 def val2txt(v: typing.Any) -> str:
     """ Creates a string version of all acceptable inputs, helpful if writing to an ASCII file
@@ -497,7 +550,8 @@ def val2txt(v: typing.Any) -> str:
         return fmt_value(v, str)
     raise ValueError('Following value cannot be converted to text', v)
 
-def txt2val(v) -> typing.Any:
+
+def txt2val(v: str) -> typing.Any:
     """ Convert text value provided to guessed python type
 
     :param v:  value of unknown type read in from a string input
@@ -549,90 +603,121 @@ def txt2val(v) -> typing.Any:
         return int(fv)
     return fv
 
-def process_container(container, dc: dataclasses.dataclass = str) -> list:
+
+def process_container(container: typing.Union[str, list, object], dc: type = str) -> list:
     """ Process container to format into list of dataclasses
 
     :param container:  this is a generic container to be standardized to list[dataclass].
         If it is a list then it is assumed that only the first element has its intended
         format and that the number of elements equals the number of variables in the dataclass.
     :type container:  str | list | dataclass | list[dataclass]
+
+    :param dc:  this is either a value of string or a type-hinted dataclass used to standardize
+        the container to List[dc]
+    :type dc: type (either str or dataclass)
     """
     if dc == str:
-        if isinstance(container, list):
-            for x in container:
-                if not isinstance(x, str):
-                    raise ValueError(
-                        'If container is a list and dc=str, ' \
-                        + 'then must have a string or list of strings'
-                    )
-            return container
         if isinstance(container, str):
             return [container]
+        if isinstance(container, list):
+            if not all(isinstance(x, str) for x in container):
+                raise ValueError(
+                    'If container is a list and dc=str, '
+                    + 'then must have a string or list of strings'
+                )
+            return container
         raise ValueError(
-            'If container is a list and dc=str, ' \
+            'If container is a list and dc=str, '
             + 'then must have a string or list of strings'
         )
     if isinstance(container, list):
-        if isinstance(container[0], dc):
-            # List containing a dataclass
-            for x in container:
-                if not isinstance(x, dc):
-                    raise ValueError(
-                        'If container is a list, ' \
-                        + 'it must contain only dataclasses or lists and not both'
-                    )
+        # List[objects]
+        if all(isinstance(x, dc) for x in container):
             return container
-        if isinstance(container[0], list):
-            # List containing a list
-            for x in container:
-                if not isinstance(x, list):
-                    raise ValueError(
-                        'If container is a list, ' \
-                        + 'it must contain only dataclasses or lists and not both'
-                    )
-                if len(x) != len(dataclasses.fields(dc)):
-                    raise ValueError(
-                        'If container is a list of lists, ' \
-                        + 'each list must equal length of the total number of fields'
-                    )
-            return [dc(*x) for x in container]
-        if isinstance(container[0], typing.get_type_hints(dc)[dataclasses.fields(dc)[0].name]):
-            # List containing whose first entry is of correct dataclass field type
-            if len(container) != len(dataclasses.fields(dc)):
-                raise ValueError(
-                    'If container is a list of field values, ' \
-                    + 'the list must equal length of the total number of fields'
-                )
-            return [dc(*container)]
-        raise ValueError('Container is a list but cannot be processed')
+        try:
+            dc_fmt = get_dc_type_hints(dc)
+        except TypeError as exc:
+            raise TypeError('If type is not specified as string then dc must be a dataclass') from exc
+        n_fields = len(dc_fmt.keys())
+        print('here:', container)
+        fmt_0 = dc_fmt[dataclasses.fields(dc)[0].name]
+        print('  there:', fmt_0)
+        # List[Values]
+        if len(container) == n_fields:
+            # Require that if a list of values is supplied, at least first element needs to
+            # be the correct type (often this may be a string), it provides some guard to
+            # distinguish between a list of lists or a list of values.
+            if isinstance(container[0], fmt_0):
+                return [dc(*container)]
+            # If fail, still possible that it is List[List[values]]
+        # List[List[values]]
+        if all(isinstance(x, list) for x in container):
+            if all(len(x) == n_fields and isinstance(x[0], fmt_0) for x in container):
+                return [dc(*x) for x in container]
+        raise ValueError(
+            'If container is a list, '
+            + 'it must contain only dataclasses or lists and not both'
+        )
     if isinstance(container, dc):
         return [container]
     raise ValueError('process container reached end of decision tree with no action')
 
-##
-## Helpers to read and write dataclasses to lists and vice versa
-##
 
-def define_dataclass(c: object, dc: dataclasses.dataclass) -> dataclasses.dataclass:
-    """ Output dataclass instance where values come from generic class c corresponding to attributes listed in dc
+#
+# Helpers to read and write dataclasses to lists and vice versa
+#
+
+
+def populate_list(c: object, dc: typing.Union[type, object]) -> list:
+    """ Populate list of values for fields in dataclass dc that come from generic class c
 
     :param c:  class containing some or all of variables in dc
-    :type c:  generic object
+    :type c:  generic class object
 
-    :param dc:  dataclass definition containing the desired variables to be filled
+    :param dc:  dataclass type containing the desired variables to be filled
     :type dc:  dataclass
     """
-    # Note write_txt_class(c,t) == write_txt(define_tup_class(c,t))
+    if dataclasses.is_dataclass(dc):
+        fields_dict = get_dc_type_hints(dc)
+        if not isinstance(dc, type):
+            dc = type(dc)
+    else:
+        raise TypeError('Second parameter must be a dataclass or an instance of a dataclass')
+    # Now create list of extracted fields from c that exist in dc
     ret_list = []
     c_attrs = dir(c)
-    for field in get_dc_type_hints(dc):
+    for field in fields_dict:
         if field in c_attrs:
             ret_list.append(getattr(c, field))
         else:
             ret_list.append('')
-    return dc(*ret_list)
+    # Return instance of type dc
+    return ret_list
 
-def read_txt(input_list) -> list:
+
+def define_dataclass(c: object, dc: type) -> object:
+    """ Output dataclass instance where values come from generic class c
+        corresponding to attributes listed in dc
+
+    :param c:  class containing some or all of variables in dc
+    :type c:  generic class object
+
+    :param dc:  dataclass definition containing the desired variables to be filled
+    :type dc:  dataclass
+    """
+    try:
+        dc_list = populate_list(c, dc)
+    except TypeError as exc:
+        raise TypeError(
+            'Incorrect type of parameters: types should be class object, dataclass respectively'
+        ) from exc
+    return dc(*dc_list)
+
+
+# Handy function to perform intial formatting of CSV read
+
+
+def read_txt(input_list: list) -> list:
     """ Attempt to autoconvert values in input_list and return a new list containing guessed formatted values
 
     :param input_list:  unformatted list of strings
@@ -640,22 +725,11 @@ def read_txt(input_list) -> list:
     """
     return [txt2val(x) for x in input_list]
 
-def write_txt(dc) -> typing.List[str]:
-    """ Output list of strings in order they appear in dataclass dc
 
-    :param dc:  dataclass containing variables to output
-    :type dc:  dataclass
-    """
-    try:
-        field_names = get_dc_type_hints(dc)
-    except (TypeError, AttributeError):
-        try:
-            field_names = dc._fields
-        except AttributeError as exc:
-            raise TypeError('Input to write_txt must be dataclass or tuple') from exc
-    return [val2txt(getattr(dc, field)) for field in field_names]
+# Set of functions to prep data from dataclass for output to text only CSV write
 
-def write_txt_class(c: object, dc: object) -> typing.List[str]:
+
+def write_txt_class(c: object, dc: typing.Union[type, object]) -> typing.List[str]:
     """ Output list of strings where values come from generic class c with attributes from dc
 
     :param c:  class containing some or all of variables in dc
@@ -665,17 +739,29 @@ def write_txt_class(c: object, dc: object) -> typing.List[str]:
     :type dc:  dataclass
     """
     try:
-        field_names = get_dc_type_hints(dc)
-    except (TypeError, AttributeError):
-        try:
-            field_names = dc._fields
-        except AttributeError as exc:
-            raise TypeError('Input to write_txt must be dataclass or tuple') from exc
-    return [val2txt(getattr(c, field)) for field in field_names]
+        dc_list = populate_list(c, dc)
+    except TypeError as exc:
+        raise TypeError(
+            'Incorrect type of parameters: types should be class object, dataclass respectively'
+        ) from exc
+    return [val2txt(x) for x in dc_list]
 
-def write_txt_row(src_inst: object, dest_class: object=None):
-    """ This function acts like write_txt_class if dest_class is specified
-        but is equivalent to write_txt if not specified
+
+# The next two functions are just variant / special cases of write_txt_class
+
+
+def write_txt(dc: object) -> typing.List[str]:
+    """ Output list of strings in order they appear in dataclass dc
+
+    :param dc:  dataclass containing variables to output
+    :type dc:  dataclass
+    """
+    return write_txt_class(dc, dc)
+
+
+def write_txt_row(src_inst: object, dest_class: type = None) -> typing.List[str]:
+    """ This function calls write_txt_class if dest_class is specified
+        but calls write_txt if not specified
 
     :param src_inst:  class containing some or all of variables in dc
     :type src_inst:  generic object
@@ -684,9 +770,5 @@ def write_txt_row(src_inst: object, dest_class: object=None):
     :type dest_class:  dataclass
     """
     if dest_class is None:
-        dest_class = type(src_inst)
-    try:
-        field_names = get_dc_type_hints(dest_class)
-    except (TypeError, AttributeError) as exc:
-        raise TypeError('Input to write_txt_row must be dataclass') from exc
-    return [val2txt(getattr(src_inst, field)) for field in field_names]
+        return write_txt(src_inst)
+    return write_txt_class(src_inst, dest_class)
