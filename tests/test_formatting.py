@@ -404,7 +404,8 @@ def test_process_container():
     # Container is dataclass
     assert process_container(TestDC(1, {1, 2}), TestDC) == [TestDC(x=1, y={1, 2})]
     # Container is a list of dataclasses
-    assert process_container([TestDC(1, {1, 2}), TestDC(2, {3, 4})], TestDC) == [TestDC(x=1, y={1, 2}), TestDC(2, {3, 4})]
+    assert process_container([TestDC(1, {1, 2}), TestDC(2, {3, 4})], TestDC) \
+        == [TestDC(x=1, y={1, 2}), TestDC(2, {3, 4})]
     with pytest.raises(ValueError):
         process_container([TestDC(1, {1, 2}), [1, {1, 2}]], TestDC)
     with pytest.raises(TypeError):

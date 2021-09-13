@@ -211,8 +211,7 @@ def base_read_xlsx(
             ws = wb[sheet_name]
         except KeyError as exc:
             raise KeyError(
-                'Excel worksheet %s not found in workbook %s, ' \
-                + 'make sure source sheet is defined and named correctly.'
+                'Excel worksheet %s not found in workbook %s, make sure source sheet is defined and named correctly.'
                 % (sheet_name, str(infile))
             ) from exc
         xls_rows = ws.values
@@ -245,28 +244,28 @@ def base_add_item(
         item_key: typing.Any,
         item_dict: typing.Dict[typing.Any, object]
         ) -> typing.List[typing.Any]:
-    """ Iterates over a container (e.g., list of item_src_class instances), 
-        creates item_dest_class instance, and then adds the instance to 
+    """ Iterates over a container (e.g., list of item_src_class instances),
+        creates item_dest_class instance, and then adds the instance to
         item_dict with key item_key
 
-    :param item_container: a variable containing one or more records in 
+    :param item_container: a variable containing one or more records in
         either raw or formatted form
-    :type item_container: list of variables in order of item_src_class, 
+    :type item_container: list of variables in order of item_src_class,
         item_src_class, or list[item_src_class]
 
-    :param item_src_class: a dataclass with type hinting for each variable, 
+    :param item_src_class: a dataclass with type hinting for each variable,
         typically defined to contain only the variables for input/output
     :type item_src_class: dataclass
 
-    :param item_dest_class: a dataclass that contains a superset of variables 
+    :param item_dest_class: a dataclass that contains a superset of variables
         as item_src_class and in the same order
     :type item_dest_class: dataclass
 
-    :param item_key: one of the variables of item_dest_class that is unique 
+    :param item_key: one of the variables of item_dest_class that is unique
         to an instance
     :type item_key: string
 
-    :param item_dict: dictionary that aids in the reference and organization 
+    :param item_dict: dictionary that aids in the reference and organization
         of the item_dest_class instances
     :type item_dict: Dictionary[item_key, item_dest_class instance]
     """
@@ -289,7 +288,7 @@ def base_add_item(
             item_inst_key = getattr(item_inst, item_key)
         except AttributeError as exc:
             raise AttributeError(
-                'base_add_item: item_key is not an attribute of item_class'
+                'base_add_item: item_key is not an attribute of item_dest_class'
             ) from exc
         if item_inst_key in item_dict:
             continue

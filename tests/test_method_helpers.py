@@ -4,7 +4,6 @@ import pytest
 # Import global modules
 import pathlib
 import dataclasses
-import typing
 
 # Import items to test
 from ..method_helpers import \
@@ -14,19 +13,23 @@ from ..method_helpers import \
 root = pathlib.Path.cwd()
 print(root.name)
 
+
 @dataclasses.dataclass
 class Type1Class:
     var1: str
     var2: str
+
 
 @dataclasses.dataclass
 class Type2Class:
     field1: str
     field2: str
 
+
 @dataclasses.dataclass
 class Type3Class:
     field1: str
+
 
 @dataclasses.dataclass
 class UmbrellaClass:
@@ -44,8 +47,9 @@ class UmbrellaClass:
     def add_t3(self, t3_inst):
         self.t3dict[t3_inst.field1] = t3_inst
 
-# All of these tests are inherently tested by the various classes that call them
-# but we should add in separate test files and unit tests
+
+# We test xls and xlsx first to provide a base instance for testing rest
+
 
 def test_base_read_xls():
     uc = UmbrellaClass('Test XLS')
@@ -57,21 +61,20 @@ def test_base_read_xls():
         ]
     ) == (9, [5, 4])
     assert uc.t1dict == {
-        'Value1.1': Type1Class(var1='Value1.1', var2='Value2.1'), 
+        'Value1.1': Type1Class(var1='Value1.1', var2='Value2.1'),
         'Value1.2': Type1Class(var1='Value1.2', var2='Value2.2'),
         'Value1.3': Type1Class(var1='Value1.3', var2='Value2.3'),
         'Value1.4': Type1Class(var1='Value1.4', var2='Value2.4'),
         'Value1.5': Type1Class(var1='Value1.5', var2='Value2.5')
     }
     assert uc.t2dict == {
-        'Value1.1': Type2Class(field1='Value1.1', field2='Value2.1'), 
+        'Value1.1': Type2Class(field1='Value1.1', field2='Value2.1'),
         'Value1.2': Type2Class(field1='Value1.2', field2='Value2.2'),
         'Value1.3': Type2Class(field1='Value1.3', field2='Value2.3'),
         'Value1.4': Type2Class(field1='Value1.4', field2='Value2.4')
     }
 
     # Create various errors
-    uc1 = UmbrellaClass('Error Instance')
 
     # Incorrect number of list items
     with pytest.raises(ValueError):
@@ -81,7 +84,7 @@ def test_base_read_xls():
                 ['1epyT', uc.add_t1]
             ]
         )
-    
+
     # Sheet name not found
     with pytest.raises(ValueError):
         base_read_xls(
@@ -120,18 +123,56 @@ def test_base_read_xlsx():
         ]
     ) == (9, [5, 4])
     assert uc.t1dict == {
-        'Value1.1': Type1Class(var1='Value1.1', var2='Value2.1'), 
+        'Value1.1': Type1Class(var1='Value1.1', var2='Value2.1'),
         'Value1.2': Type1Class(var1='Value1.2', var2='Value2.2'),
         'Value1.3': Type1Class(var1='Value1.3', var2='Value2.3'),
         'Value1.4': Type1Class(var1='Value1.4', var2='Value2.4'),
         'Value1.5': Type1Class(var1='Value1.5', var2='Value2.5')
     }
     assert uc.t2dict == {
-        'Value1.1': Type2Class(field1='Value1.1', field2='Value2.1'), 
+        'Value1.1': Type2Class(field1='Value1.1', field2='Value2.1'),
         'Value1.2': Type2Class(field1='Value1.2', field2='Value2.2'),
         'Value1.3': Type2Class(field1='Value1.3', field2='Value2.3'),
         'Value1.4': Type2Class(field1='Value1.4', field2='Value2.4')
     }
+
+    # Create various errors
+
+    # Incorrect number of list items
+    with pytest.raises(ValueError):
+        base_read_xlsx(
+            root / 'tests' / 'test_xlsx.xlsx',
+            [
+                ['1epyT', uc.add_t1]
+            ]
+        )
+
+    # Sheet name not found
+    with pytest.raises(KeyError):
+        base_read_xlsx(
+            root / 'tests' / 'test_xlsx.xlsx',
+            [
+                ['1epyT', uc.add_t1, Type1Class]
+            ]
+        )
+
+    # Record type mismatch in number of records
+    with pytest.raises(TypeError):
+        base_read_xlsx(
+            root / 'tests' / 'test_xlsx.xlsx',
+            [
+                ['Type1', uc.add_t3, Type3Class]
+            ]
+        )
+
+    # Record type mismatch in number of records
+    with pytest.raises(ValueError):
+        base_read_xlsx(
+            root / 'tests' / 'test_xlsx.xlsx',
+            [
+                ['Type1', uc.add_t3, Type1Class]
+            ]
+        )
 
 
 def test_base_write_file():
@@ -161,7 +202,7 @@ def test_base_write_file():
         + 'Value1.3|Value2.3\n' \
         + 'Value1.4|Value2.4\n' \
         + 'Value1.5|Value2.5\n'
-    
+
     # Trigger ValueError if rt_lists is incomplete
     with pytest.raises(ValueError):
         assert base_write_file(
@@ -228,8 +269,7 @@ def test_base_read_file():
     ) == 5
     assert uc0.t1dict == uc2.t1dict
 
-    # Trigger Value Error
-    uc3 = UmbrellaClass('Test XLSX')
+    # Trigger Value Error from deficient rt_list
     with pytest.raises(ValueError):
         base_read_file(
             root / 'tests' / 'test_asc_1.txt',
@@ -237,6 +277,7 @@ def test_base_read_file():
                 [uc2.add_t1, Type1Class]
             ]
         )
+
 
 def test_base_add_item():
     @dataclasses.dataclass
@@ -255,6 +296,18 @@ def test_base_add_item():
         dc_dict: dict = dataclasses.field(init=False, default_factory=dict)
 
     a = City()
+    # If incorrect src_class given then raise ValueError
+    with pytest.raises(ValueError):
+        base_add_item(TestDC(1, '1', (1,)), City, DestDC, 'x', a.dc_dict)
+
+    # If values cannot be converted to src_class formatting ValueError
+    with pytest.raises(ValueError):
+        base_add_item([1, 1, {1: '1'}], TestDC, DestDC, 'x', a.dc_dict)
+
+    # If key is not field in src_class then AttributeError
+    with pytest.raises(AttributeError):
+        base_add_item([1, 1, 1], TestDC, DestDC, 'v', a.dc_dict)
+
     # Add first time item as list of variables, returns one key
     assert base_add_item(
         [1, 1, 1], TestDC, DestDC, 'x', a.dc_dict
@@ -282,4 +335,3 @@ def test_base_add_item():
     ) == [5, 6]
     assert a.dc_dict[5] == DestDC(5, '5', (5,), [])
     assert a.dc_dict[6] == DestDC(6, '6', ('6',), [])
-
