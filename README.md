@@ -1,6 +1,6 @@
 # Tools
 
-This is a collection of common tools to use across projects. No project specific tools should live here.
+This is a collection of common tools to use across projects. It current passes all tests for python v3.7, v3.8, v3.9. Python v3.6 is not supported.
 
 1. ``formatting``: This module includes a number of type conversion functions as well as functions to format, read and write type hinted dataclasses.
 1. ``method_helpers``: This module provides some convenience function to read and write from a dataclass to a pipe delimited file.
@@ -47,7 +47,8 @@ These applications grew from supporting ``namedtuples`` to ``dataclasses``. They
 
 ## Method Helpers
 
-The following helpers were developed in applications where a parent class holds a set of instances of a dataclass in a dictionary for organization, updating, and maintenance. 
+The following helpers were developed in applications where a parent class holds a set of instances of a dataclass in a dictionary for organization, updating, and maintenance.
+
 1. ``__unixpipe``: This defines an internal default csv dialect that is pipe delimited.
 1. ``base_read_file``: This reads from the specified ASCII file using the parameters for identifying and processing each record type into the given dataclass. It returns total number of records read from the file.
 1. ``base_write_file``: This writes to the specified file file from a dictionary reference to a set of dataclass instances. It returns total number of records written to the file.
