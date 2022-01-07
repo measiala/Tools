@@ -639,9 +639,9 @@ def process_container(container: typing.Union[str, list, object], dc: type = str
         except TypeError as exc:
             raise TypeError('If type is not specified as string then dc must be a dataclass') from exc
         n_fields = len(dc_fmt.keys())
-        print('here:', container)
+        #print('here:', container)
         fmt_0 = dc_fmt[dataclasses.fields(dc)[0].name]
-        print('  there:', fmt_0)
+        #print('  there:', fmt_0)
         # List[Values]
         if len(container) == n_fields:
             # Require that if a list of values is supplied, at least first element needs to
