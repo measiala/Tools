@@ -18,7 +18,9 @@ import typing
 # and also selective uses detailed versus generic type hints
 
 
-def get_ga_types(ga_type: typing.Type) -> typing.Tuple[typing.Any, typing.Tuple[typing.Any, ...]]:
+def get_ga_types(
+    ga_type: typing.Type,
+) -> typing.Tuple[typing.Any, typing.Tuple[typing.Any, ...]]:
     """ Return base origin and arguments type of Generic type in a version-independent method
 
     :param ga_type: Generic type defined using typing
@@ -29,15 +31,19 @@ def get_ga_types(ga_type: typing.Type) -> typing.Tuple[typing.Any, typing.Tuple[
         _origin = typing.get_origin(ga_type)
         _args = typing.get_args(ga_type)
         if (_origin, _args) == (None, ()):
-            raise TypeError('Position parameter for get_ga_types must be a Generic class')
+            raise TypeError(
+                "Position parameter for get_ga_types must be a Generic class"
+            )
     elif sys.version_info >= (3, 7, 0):
         try:
             _origin = ga_type.__origin__
             _args = ga_type.__args__
         except AttributeError as exc:
-            raise TypeError('Position parameter for get_ga_types must be a Generic class') from exc
+            raise TypeError(
+                "Position parameter for get_ga_types must be a Generic class"
+            ) from exc
     else:
-        raise NotImplementedError('Support is not provided for python version < v3.7')
+        raise NotImplementedError("Support is not provided for python version < v3.7")
     return _origin, _args
 
 
@@ -51,7 +57,7 @@ def get_dc_type_hints(dc: object) -> typing.Dict[str, typing.Any]:
     try:
         fields = dataclasses.fields(dc)
     except (TypeError, AttributeError) as exc:
-        raise TypeError('Input to get_dc_type_hints must be a dataclass') from exc
+        raise TypeError("Input to get_dc_type_hints must be a dataclass") from exc
     for x in fields:
         try:
             _origin, _args = get_ga_types(x.type)
@@ -69,14 +75,15 @@ def get_dc_type_hints(dc: object) -> typing.Dict[str, typing.Any]:
                 _args_in = False
                 break
         if _origin in [list, dict, set, tuple] and _args_in:
-            type_dict[x.name] = x.type              # Try basic GenericAlias approach
+            type_dict[x.name] = x.type  # Try basic GenericAlias approach
         else:
-            type_dict[x.name] = _origin             # This removes the types of the args
+            type_dict[x.name] = _origin  # This removes the types of the args
         continue
     return type_dict
 
 
 # Format single element values, form is : fmt_<dynamic_type>(value, <dest_type>)
+
 
 def fmt_bool(value: bool, fmt: type) -> typing.Any:
     """ Convert known boolean value to fmt
@@ -116,7 +123,7 @@ def fmt_bool(value: bool, fmt: type) -> typing.Any:
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             return fmt_list([fmt_bool(value, elem_fmt)], base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_float(value: float, fmt: type) -> typing.Any:
@@ -145,7 +152,7 @@ def fmt_float(value: float, fmt: type) -> typing.Any:
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
             return fmt_list([fmt_float(value, elem_fmt)], base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_int(value: int, fmt: type) -> typing.Any:
@@ -186,9 +193,9 @@ def fmt_int(value: int, fmt: type) -> typing.Any:
         # base_fmt is standard generic format of type
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
-            print(base_fmt, elem_fmt, fmt_int(value, elem_fmt))
+            # print(base_fmt, elem_fmt, fmt_int(value, elem_fmt))
             return fmt_list([fmt_int(value, elem_fmt)], base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_none(value: None, fmt: type) -> typing.Any:
@@ -204,7 +211,7 @@ def fmt_none(value: None, fmt: type) -> typing.Any:
     if fmt is None:
         return value
     if fmt == str:
-        return ''
+        return ""
     if fmt == dict:
         return {}
     if fmt == list:
@@ -224,7 +231,7 @@ def fmt_none(value: None, fmt: type) -> typing.Any:
         # base_fmt is standard generic format of type
         if base_fmt in [list, set, tuple]:
             return fmt_none(value, base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_str(value: str, fmt: type) -> typing.Any:
@@ -240,11 +247,11 @@ def fmt_str(value: str, fmt: type) -> typing.Any:
     if fmt == str:
         return value
     # Special cases if string is blank and want to return empty dict, list, etc.
-    if value == '':
+    if value == "":
         return fmt_none(None, fmt)
     # Basic structures
     if fmt == bool:
-        return value.title() == 'True'
+        return value.title() == "True"
     if fmt in [int, float]:
         try:
             new_value = float(value)
@@ -284,7 +291,7 @@ def fmt_str(value: str, fmt: type) -> typing.Any:
         if base_fmt in [list, set, tuple]:
             if value:
                 return fmt_list([fmt_str(value, elem_fmt)], base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (value, str(fmt)))
 
 
 def fmt_dict(value: dict, fmt: type) -> typing.Any:
@@ -302,7 +309,7 @@ def fmt_dict(value: dict, fmt: type) -> typing.Any:
     # Conversion to comma-delimited string
     if fmt == str:
         # Return str(list) but without the square brackets
-        return ','.join(fmt_dict(value, typing.List[str]))
+        return ",".join(fmt_dict(value, typing.List[str]))
     if fmt == list:
         new_list = []
         for x in value.keys():
@@ -331,7 +338,7 @@ def fmt_dict(value: dict, fmt: type) -> typing.Any:
                 if new_key not in new_dict:
                     new_dict[new_key] = new_value
             return fmt_dict(new_dict, base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (value, str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (value, str(fmt)))
 
 
 def fmt_list(value: list, fmt: type) -> typing.Any:
@@ -349,7 +356,7 @@ def fmt_list(value: list, fmt: type) -> typing.Any:
     # Conversion to comma-delimited string
     if fmt == str:
         # Return str(list) but without the square brackets
-        return ','.join([fmt_value(x, str) for x in value])
+        return ",".join([fmt_value(x, str) for x in value])
     # Basic conversions
     if fmt == set:
         return set(value)
@@ -357,7 +364,7 @@ def fmt_list(value: list, fmt: type) -> typing.Any:
         return tuple(value)
     # Dict, if length is even then define using adjacent pairs in order
     if fmt == dict and len(value) % 2 == 0:
-        return {value[k]: value[k+1] for k in range(0, len(value), 2)}
+        return {value[k]: value[k + 1] for k in range(0, len(value), 2)}
     # Generic types
     try:
         base_fmt, _args = get_ga_types(fmt)
@@ -381,7 +388,7 @@ def fmt_list(value: list, fmt: type) -> typing.Any:
                 return fmt_list(new_list, base_fmt)
             # Handle empty list so no elements to format
             return fmt_list(value, base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_set(value, fmt) -> typing.Any:
@@ -400,7 +407,7 @@ def fmt_set(value, fmt) -> typing.Any:
     if fmt == str:
         # Return str(list) but without the square brackets
         new_value = {fmt_value(x, str) for x in value}
-        return ','.join(sorted(new_value))
+        return ",".join(sorted(new_value))
     # Basic conversions
     if fmt == list:
         return list(value)
@@ -419,7 +426,7 @@ def fmt_set(value, fmt) -> typing.Any:
         if base_fmt in [list, set, tuple]:
             new_set = {fmt_value(x, elem_fmt) for x in value}
             return fmt_set(new_set, base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_tuple(value: tuple, fmt: type) -> typing.Any:
@@ -438,7 +445,7 @@ def fmt_tuple(value: tuple, fmt: type) -> typing.Any:
     # Conversion to comma-delimited string
     if fmt == str:
         # Return str(list) but without the square brackets
-        return ','.join([fmt_value(x, str) for x in value])
+        return ",".join([fmt_value(x, str) for x in value])
     # Basic conversions
     if fmt == list:
         return list(value)
@@ -456,7 +463,7 @@ def fmt_tuple(value: tuple, fmt: type) -> typing.Any:
         if base_fmt in [list, set, tuple]:
             new_tuple = tuple([fmt_value(x, elem_fmt) for x in value])
             return fmt_tuple(new_tuple, base_fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_value(value: typing.Any, fmt: type) -> typing.Any:
@@ -490,7 +497,7 @@ def fmt_value(value: typing.Any, fmt: type) -> typing.Any:
         return fmt_str(value, fmt)
     if isinstance(value, tuple):
         return fmt_tuple(value, fmt)
-    raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
+    raise ValueError("Cannot handle putting %s into format %s" % (str(value), str(fmt)))
 
 
 def fmt_dataclass(dc: object) -> object:
@@ -503,7 +510,7 @@ def fmt_dataclass(dc: object) -> object:
         dc_dict = dataclasses.asdict(dc)
         dc_types = get_dc_type_hints(dc)
     except TypeError as exc:
-        raise TypeError('Must supply a type hinted dataclass as input') from exc
+        raise TypeError("Must supply a type hinted dataclass as input") from exc
 
     rdc_dict = {}
     for x in dc_dict:
@@ -511,11 +518,11 @@ def fmt_dataclass(dc: object) -> object:
             rdc_dict[x] = fmt_value(dc_dict[x], dc_types[x])
         except ValueError as exc:
             raise ValueError(
-                'Cannot handle putting field %s = %s into format %s'
+                "Cannot handle putting field %s = %s into format %s"
                 % (str(x), str(dc_dict[x]), str(dc_types[x]))
             ) from exc
 
-    rdc = getattr(dc, '__class__')
+    rdc = getattr(dc, "__class__")
     return rdc(**rdc_dict)
 
 
@@ -548,7 +555,7 @@ def val2txt(v: typing.Any) -> str:
         return fmt_list(sorted(v), str)
     if isinstance(v, (bool, dict, float, int, list, tuple)) or v is None:
         return fmt_value(v, str)
-    raise ValueError('Following value cannot be converted to text', v)
+    raise ValueError("Following value cannot be converted to text", v)
 
 
 def txt2val(v: str) -> typing.Any:
@@ -560,32 +567,32 @@ def txt2val(v: str) -> typing.Any:
     # If the string contains a boolean keyword then treat as boolean
     if not isinstance(v, str):
         return v
-    if v == 'None':
+    if v == "None":
         return None
-    if v.title() in ['True', 'False']:
-        return v.title() == 'True'
+    if v.title() in ["True", "False"]:
+        return v.title() == "True"
     # If the string contains a comma treat as list
-    if ',' in v:
-        nv = v.split(',')
+    if "," in v:
+        nv = v.split(",")
         return [txt2val(x.strip()) for x in nv]
     # Otherwise check if it is a number
     # First address integers of base 2, 8, or 16
     if len(v) > 2:
-        if v[:2] == '0b':
+        if v[:2] == "0b":
             try:
                 nv = int(v, 2)
             except (TypeError, ValueError):
                 return v
             else:
                 return nv
-        elif v[:2] == '0o':
+        elif v[:2] == "0o":
             try:
                 nv = int(v, 8)
             except (TypeError, ValueError):
                 return v
             else:
                 return nv
-        elif v[:2] == '0x':
+        elif v[:2] == "0x":
             try:
                 nv = int(v, 16)
             except (TypeError, ValueError):
@@ -604,7 +611,9 @@ def txt2val(v: str) -> typing.Any:
     return fv
 
 
-def process_container(container: typing.Union[str, list, object], dc: type = str) -> list:
+def process_container(
+    container: typing.Union[str, list, object], dc: type = str
+) -> list:
     """ Process container to format into list of dataclasses
 
     :param container:  this is a generic container to be standardized to list[dataclass].
@@ -622,13 +631,13 @@ def process_container(container: typing.Union[str, list, object], dc: type = str
         if isinstance(container, list):
             if not all(isinstance(x, str) for x in container):
                 raise ValueError(
-                    'If container is a list and dc=str, '
-                    + 'then must have a string or list of strings'
+                    "If container is a list and dc=str, "
+                    + "then must have a string or list of strings"
                 )
             return container
         raise ValueError(
-            'If container is a list and dc=str, '
-            + 'then must have a string or list of strings'
+            "If container is a list and dc=str, "
+            + "then must have a string or list of strings"
         )
     if isinstance(container, list):
         # List[objects]
@@ -637,11 +646,13 @@ def process_container(container: typing.Union[str, list, object], dc: type = str
         try:
             dc_fmt = get_dc_type_hints(dc)
         except TypeError as exc:
-            raise TypeError('If type is not specified as string then dc must be a dataclass') from exc
+            raise TypeError(
+                "If type is not specified as string then dc must be a dataclass"
+            ) from exc
         n_fields = len(dc_fmt.keys())
-        #print('here:', container)
+        # print('here:', container)
         fmt_0 = dc_fmt[dataclasses.fields(dc)[0].name]
-        #print('  there:', fmt_0)
+        # print('  there:', fmt_0)
         # List[Values]
         if len(container) == n_fields:
             # Require that if a list of values is supplied, at least first element needs to
@@ -655,12 +666,12 @@ def process_container(container: typing.Union[str, list, object], dc: type = str
             if all(len(x) == n_fields and isinstance(x[0], fmt_0) for x in container):
                 return [dc(*x) for x in container]
         raise ValueError(
-            'If container is a list, '
-            + 'it must contain only dataclasses or lists and not both'
+            "If container is a list, "
+            + "it must contain only dataclasses or lists and not both"
         )
     if isinstance(container, dc):
         return [container]
-    raise ValueError('process container reached end of decision tree with no action')
+    raise ValueError("process container reached end of decision tree with no action")
 
 
 #
@@ -682,7 +693,9 @@ def populate_list(c: object, dc: typing.Union[type, object]) -> list:
         if not isinstance(dc, type):
             dc = type(dc)
     else:
-        raise TypeError('Second parameter must be a dataclass or an instance of a dataclass')
+        raise TypeError(
+            "Second parameter must be a dataclass or an instance of a dataclass"
+        )
     # Now create list of extracted fields from c that exist in dc
     ret_list = []
     c_attrs = dir(c)
@@ -690,7 +703,7 @@ def populate_list(c: object, dc: typing.Union[type, object]) -> list:
         if field in c_attrs:
             ret_list.append(getattr(c, field))
         else:
-            ret_list.append('')
+            ret_list.append("")
     # Return instance of type dc
     return ret_list
 
@@ -709,7 +722,7 @@ def define_dataclass(c: object, dc: type) -> object:
         dc_list = populate_list(c, dc)
     except TypeError as exc:
         raise TypeError(
-            'Incorrect type of parameters: types should be class object, dataclass respectively'
+            "Incorrect type of parameters: types should be class object, dataclass respectively"
         ) from exc
     return dc(*dc_list)
 
@@ -742,7 +755,7 @@ def write_txt_class(c: object, dc: typing.Union[type, object]) -> typing.List[st
         dc_list = populate_list(c, dc)
     except TypeError as exc:
         raise TypeError(
-            'Incorrect type of parameters: types should be class object, dataclass respectively'
+            "Incorrect type of parameters: types should be class object, dataclass respectively"
         ) from exc
     return [val2txt(x) for x in dc_list]
 
