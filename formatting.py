@@ -186,7 +186,7 @@ def fmt_int(value: int, fmt: type) -> typing.Any:
         # base_fmt is standard generic format of type
         elem_fmt = _args[0]
         if base_fmt in [list, set, tuple]:
-            print(base_fmt, elem_fmt, fmt_int(value, elem_fmt))
+            #print(base_fmt, elem_fmt, fmt_int(value, elem_fmt))
             return fmt_list([fmt_int(value, elem_fmt)], base_fmt)
     raise ValueError('Cannot handle putting %s into format %s' % (str(value), str(fmt)))
 
